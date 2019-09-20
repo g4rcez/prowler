@@ -1,80 +1,90 @@
 import cheerio from "cheerio";
-import puppeter, { Page } from "puppeteer";
-import signale from "signale";
-import File from "../utils/File";
-import UaGenerator from "../utils/UaGenerator";
-import Event from "./eventEmitter";
-import IReport from "./IReport";
-import IWorker from "./IWorker";
+import puppeter from "puppeteer";
+import url from "url";
 import log from "../utils/Log";
+import UaGenerator from "../utils/UaGenerator";
+import { EventEmitter } from "./EventEmitter";
 
-export class BrowserWorkerReport implements IReport<BrowserWorkerReport> {
-	public name: string;
-	public workDirectory: string;
-	public url: URL;
-	public hostname: string;
-	public html: string;
-	public printDirectory?: string;
-	parseReport(report: BrowserWorkerReport): void {
-		throw new Error("Method not implemented.");
-	}
-
-	constructor(props: Partial<BrowserWorkerReport>) {
-		this.name = "BrowserWorkerReport";
-		this.hostname = props.hostname! || "";
-		this.workDirectory = File.dirToSaveScan(this.hostname) || "";
-		this.html = props.html! || "";
-		this.url = props.url! || "";
-	}
-}
-
+type Links = {
+	timestamp: Date;
+	isFile: boolean;
+	href: string;
+};
 type ParsePageReport = {
 	url: URL;
 	html: string;
 	href: string;
 };
 
-export class WebWorker implements IWorker<BrowserWorkerReport> {
-	private URL: URL;
-	private emitter: Event<WebWorker>;
-	constructor(url: URL) {
-		this.URL = url;
-		this.emitter = new Event({ prefixEvent: "WebWorker" });
-		this.emitter.addStartListener(() => {
-			log.start("Start with", url.href);
-		});
-		this.emitter.addEventListener("NewPage", this.parseNewPage);
-	}
-
-	private async parseNewPage(report: ParsePageReport) {
-		log.info("I Listen a new page", report.href);
-		const $ = cheerio(report.html);
-	}
-
-	async configurePage(): Promise<Page> {
-		const browser = await puppeter.launch();
-		const page = await browser.newPage();
-		await page.setJavaScriptEnabled(true);
-		await page.setUserAgent(UaGenerator());
-		return page;
-	}
-
-	async parsePage(url: URL): Promise<ParsePageReport> {
-		const page = await this.configurePage();
-		await page.goto(url.href);
-		const html = await page.content();
-		await page.close();
-		return { html, url, href: url.href };
-	}
-	async start(): Promise<void> {
-		this.emitter.emitStart();
-		const html = await this.parsePage(this.URL);
-		this.emitter.emit("NewPage", html);
-	}
-	report(): BrowserWorkerReport {
-		throw new Error("Method not implemented.");
-	}
-	complete(): void {
-		this.emitter.clean();
-	}
+async function configurePage() {
+	const browser = await puppeter.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+	const page = await browser.newPage();
+	await page.setJavaScriptEnabled(true);
+	await page.setUserAgent(UaGenerator());
+	return page;
 }
+
+export const WebWorker = async (origin: url.URL) => {
+	const emitter = EventEmitter("WebWorker");
+	const page = await configurePage();
+	const links = [
+		{
+			href: origin.href,
+			isFile: false,
+			timestamp: new Date()
+		}
+	] as Links[];
+
+	emitter.addListener("NewPage", parseNewPage);
+
+	function checkIfExist(href: string) {
+		console.log(links, href);
+		return links.some((x) => href === x.href);
+	}
+
+	async function parseNewPage(report: ParsePageReport) {
+		const $ = cheerio.load(report.html);
+		$("a").each(async (_, e) => {
+			const link = $(e).attr("href");
+			if (/https?:\/\//.test(link)) {
+				if (!checkIfExist(link)) {
+					log.info("New page", link);
+					links.push({
+						isFile: false,
+						href: link,
+						timestamp: new Date()
+					});
+					const html = await parsePage(new url.URL(link));
+					emitter.emit("NewPage", html);
+				}
+			} else {
+				log.error("Look this error", link);
+			}
+		});
+	}
+
+	async function parsePage(url: URL) {
+		try {
+			await page.goto(url.href);
+			// await page.setDefaultNavigationTimeout(5000);
+			// await page.waitForNavigation();
+			const html = await page.content();
+			await page.removeAllListeners();
+			return { html, url, href: url.href };
+		} catch (e) {
+			log.fatal(e);
+			return { html: "", url: null, href: "" };
+		}
+	}
+
+	async function start() {
+		try {
+			const html = await parsePage(origin);
+			emitter.emit("NewPage", html);
+		} catch (e) {
+			log.fatal(e);
+		}
+	}
+
+	return { start };
+};
