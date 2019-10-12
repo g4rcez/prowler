@@ -14,25 +14,27 @@ const findLineByPrefix = (lines: string[]) => (prefix: string): string | string[
 type WhoisReport = {
 	domain: string;
 	person: string | string[];
-	"e-mail": string | string[];
+	"e-mail": string[];
 	responsible: string | string[];
 	owner: string | string[];
 	ownerid: string;
 };
 
-export const Whois = async (url: string): Promise<WhoisReport> => {
-	return new Promise((resolve, reject) => {
+const emailsToArray = (args: string | string[]) => (Array.isArray(args) ? [...args] : [args]);
+
+export const Whois = async (url: string): Promise<WhoisReport> =>
+	new Promise((resolve, reject) => {
 		whois.lookup(url, (err: any, data: string) => {
 			const lines = data.toString().split("\n");
 			const findLines = findLineByPrefix(lines);
+			const emails = findLines("e-mail");
 			return resolve({
 				domain: findLines("domain") as string,
 				person: findLines("person"),
-				"e-mail": findLines("e-mail"),
+				"e-mail": emailsToArray(emails),
 				responsible: findLines("responsible"),
 				owner: findLines("owner"),
 				ownerid: findLines("ownerid") as string
 			});
 		});
 	});
-};

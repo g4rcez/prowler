@@ -1,6 +1,6 @@
-import Fetch from "../utils/Fetch";
-import { onlyNumbers, trueTrim, formatCnpj } from "sidekicker/lib/strings";
 import cheerio from "cheerio";
+import { formatCnpj, onlyNumbers, trueTrim } from "sidekicker/lib/strings";
+import Fetch from "../utils/Fetch";
 
 const parsers = {
 	CNPJ: (text: string) => {
@@ -21,7 +21,7 @@ const parsers = {
 			.replace(/\(\)/g, "")
 			.replace(/\) /g, ")")
 			.split(" ");
-		return [cellphones, "Telefones"];
+		return [[...cellphones.filter(Boolean)], "Telefones"];
 	},
 	Logradouro: (text: string) => [text, "Logradouro"],
 	Complemento: (text: string) => [text.split(": ")[1], "Complemento"],
@@ -40,7 +40,7 @@ const parseEach = (text: string) => {
 			// @ts-ignore
 			const [data, typeInfo] = parsers[parser](text);
 			if (Array.isArray(data)) {
-				return data.filter(Boolean);
+				return [data.filter(Boolean),typeInfo];
 			}
 			return [trueTrim(data), typeInfo];
 		}
@@ -48,7 +48,14 @@ const parseEach = (text: string) => {
 	return [trueTrim(text), ""];
 };
 
-const DocumentExplorer = (document: string) => {
+export type TypeDocExplorer = {
+	type: "company" | "person";
+	data: {
+		[key: string]: string;
+	};
+};
+
+const DocumentExplorer = (document: string): Promise<TypeDocExplorer | null> => {
 	const documentNumber = onlyNumbers(document);
 
 	if (documentNumber.length === 11) {
@@ -71,9 +78,9 @@ const DocumentExplorer = (document: string) => {
 				});
 				return resolve({ data: companyData, type: "company" });
 			}
-			return reject(null);
 		});
 	}
+	return new Promise(() => null);
 };
 
 export default DocumentExplorer;

@@ -24,6 +24,8 @@ async function configurePage() {
 	return page;
 }
 
+const removeBarOnString = (x: string) => x.replace(/\/$/, "");
+
 export const WebWorker = async (origin: url.URL) => {
 	const emitter = EventEmitter("WebWorker");
 	const page = await configurePage();
@@ -37,10 +39,12 @@ export const WebWorker = async (origin: url.URL) => {
 
 	emitter.addListener("NewPage", parseNewPage);
 
-	function checkIfExist(href: string) {
-		console.log(links, href);
-		return links.some((x) => href === x.href);
-	}
+	const checkIfExist = (href: string) =>
+		links.some((x) => {
+			const newHref = removeBarOnString(href);
+			const newLink = removeBarOnString(x.href);
+			return newHref === newLink;
+		});
 
 	async function parseNewPage(report: ParsePageReport) {
 		const $ = cheerio.load(report.html);
