@@ -4,6 +4,9 @@ import { WebWorker } from "./workers/WebWorker";
 import { Whois } from "./workers/Whois";
 import DocumentExplorer, { TypeDocExplorer } from "./workers/DocumentExplorer";
 import Report from "./workers/Report";
+import fs from "fs";
+import os from "os";
+import File from './utils/File';
 
 const app = new commander.Command();
 
@@ -35,6 +38,8 @@ async function main() {
 	const url = new URL.URL(app.url!);
 	const whois = await Whois(url.hostname);
 	
+	const dirname = File.createWorkDir(url.hostname);
+
 	report.addEmails(whois["e-mail"]);
 	report.domain = whois.domain;
 	report.addDocument(whois.ownerid);
@@ -42,7 +47,7 @@ async function main() {
 	const documents = await DocumentExplorer(whois.ownerid);
 	addFromDocumentExplorer(documents);
 	
-	const e = await WebWorker(url);
+	const e = await WebWorker(url,dirname);
 	e.start()
 }
 
