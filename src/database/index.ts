@@ -1,4 +1,4 @@
-//@ts-ignore
+// @ts-ignore
 import mysql from "mysql2";
 import knex from "knex";
 import credentials from "../credentials";
@@ -12,32 +12,20 @@ type DatabaseError = {
 
 export default (async () => {
   const config = await credentials();
-
-  const connector = knex({
+  const Query = knex({
     client: "mysql",
     connection: config
   });
-
   const connection = mysql.createPool({
     ...config,
     queueLimit: 50,
     waitForConnections: true
   });
-
-  const query = async <T>(str: string) =>
+  const DB = async <T>(str: string) =>
     new Promise((resolve, reject) => {
-      connection.execute(
-        str,
-        (err: DatabaseError, result: string, fields: T[]) => {
-          if (!!err) {
-            return reject(err);
-          }
-          return resolve({ data: fields, result });
-        }
+      connection.execute(str, (err: DatabaseError, result: string, data: T[]) =>
+        !!err ? reject(err) : resolve({ data, result })
       );
     });
-  return {
-    Query: connector,
-    DB: query
-  };
+  return { Query, DB };
 })();
