@@ -1,6 +1,5 @@
-import dotenv from "dotenv";
+require("dotenv").config();
 
-dotenv.load();
 const { HOST, USER, PASSWORD, DATABASE } = process.env;
 
 export default async () =>

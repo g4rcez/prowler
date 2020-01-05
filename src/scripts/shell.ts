@@ -1,7 +1,5 @@
 import childProcess from "child_process";
-import dotenv from "dotenv";
-
-dotenv.load();
+require("dotenv").config();
 
 const PYTHON = "/usr/bin/python3";
 const PATH = process.env.PYTHON_SCRIPTS;
