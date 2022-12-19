@@ -24,7 +24,7 @@
     "sidekicker": "^0.0.27",
     "signale": "^1.4.0",
     "tslib": "^1.10.0",
-    "whois": "^2.10.1"
+    "whois": "^2.13.6"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.13",
